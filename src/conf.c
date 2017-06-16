@@ -148,9 +148,26 @@ static int add_mroute(int lineno, char *ifname, char *group, char *source, char 
 			memset(&mroute, 0, sizeof(mroute));
 			mroute.inbound = mif;
 
-			if (!source || inet_pton(AF_INET6, source, &mroute.source.sin6_addr) <= 0) {
+			if (!source) {
+				mroute.source.sin6_addr = in6addr_any;
+			} else if (inet_pton(AF_INET6, source, &mroute.source.sin6_addr) <= 0) {
 				WARN("Invalid source IPv6 address: %s", source ?: "NONE");
 				return 1;
+			}
+
+			ptr = strchr(group, '/');
+			if (ptr) {
+				if (source) {
+					WARN("GROUP/LEN not yet supported for source specific multicast.");
+					return 1;
+				}
+
+				mroute.len = atoi(ptr + 1);
+				if (mroute.len < 0 || mroute.len > 128) {
+					WARN("Invalid prefix length, %s/%d", group, mroute.len);
+					return 1;
+				}
+				*ptr = 0;
 			}
 
 			if (inet_pton(AF_INET6, group, &mroute.group.sin6_addr) <= 0 || !IN6_IS_ADDR_MULTICAST(&mroute.group.sin6_addr)) {
